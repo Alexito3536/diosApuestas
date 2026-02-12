@@ -1,46 +1,81 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import os
 import numpy as np
 
-st.set_page_config(page_title="The God Engine", layout="wide")
+# 1. Configuración de la Interfaz
+st.set_page_config(page_title="El Dios de las Apuestas v3.0", page_icon="🏹", layout="wide")
 
 st.title("🏹 El Dios de las Apuestas v3.0")
-st.sidebar.header("Panel de Control")
-capital = st.sidebar.number_input("Bankroll Total ($)", value=5000)
+st.markdown("---")
 
-# Cargar el motor
+# 2. Función Maestra de Carga (Solución al AttributeError)
 @st.cache_resource
 def load_engine():
-    return joblib.load('modelo_god.pkl')
+    model_path = 'modelo_god.pkl'
+    if not os.path.exists(model_path):
+        st.error(f"❌ No se encontró el archivo '{model_path}' en GitHub.")
+        return None
+    
+    try:
+        data = joblib.load(model_path)
+        # Verificamos si lo que cargamos es la clase completa o solo el modelo
+        if hasattr(data, 'model'):
+            return data.model
+        return data
+    except Exception as e:
+        st.error(f"❌ Error al procesar el cerebro: {e}")
+        return None
 
-god_engine = load_engine()
+# Ejecutar carga
+model = load_engine()
 
-st.subheader("🚀 Oportunidades de Alta Probabilidad")
+# 3. Panel de Control Lateral
+st.sidebar.header("💰 Gestión de Bankroll")
+bankroll = st.sidebar.number_input("Tu Capital Total ($)", value=5000)
+min_ev = st.sidebar.slider("Umbral de Valor (Min EV %)", 0, 50, 10) / 100
 
-# Aquí simularemos los partidos que ya vimos que funcionan
-partidos = [
-    {'equipo': 'Arsenal vs Man City', 'prob': 0.682, 'cuota': 2.50, 'pick': 'Local'},
-    {'equipo': 'Liverpool vs Chelsea', 'prob': 0.377, 'cuota': 4.00, 'pick': 'Empate'},
-]
+if model:
+    st.sidebar.success("✅ Oráculo Conectado")
+    
+    # 4. Simulación de Análisis de Partidos (Aquí es donde ocurre la magia)
+    st.subheader("🚀 Oportunidades con Ventaja Matemática (+EV)")
+    
+    # Datos de prueba basados en tus resultados de Colab
+    # En el futuro, aquí conectaremos el Scraper automático
+    proximos_partidos = [
+        {'equipo': 'Arsenal vs Man City', 'prob_h': 0.682, 'cuota_h': 2.50, 'pick': 'Local (Arsenal)'},
+        {'equipo': 'Liverpool vs Chelsea', 'prob_h': 0.538, 'cuota_h': 1.90, 'pick': 'Local (Liverpool)'},
+        {'equipo': 'Man United vs Tottenham', 'prob_h': 0.696, 'cuota_h': 2.10, 'pick': 'Local (Man Utd)'}
+    ]
 
-for p in partidos:
-    ev = (p['prob'] * p['cuota']) - 1
-    if ev > 0.05:
-        with st.container():
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.write(f"### {p['equipo']}")
-                st.write(f"Pick: **{p['pick']}**")
-            with col2:
-                st.metric("EV (Valor)", f"{ev:+.2%}")
-                st.write(f"Probabilidad IA: {p['prob']:.1%}")
-            with col3:
-                # Criterio de Kelly para el stake
-                b = p['cuota'] - 1
-                prob_ganar = p['prob']
-                prob_perder = 1 - prob_ganar
-                stake_f = (b * prob_ganar - prob_perder) / b
-                monto = max(0, stake_f * capital * 0.2) # Kelly fraccionado al 20%
-                st.warning(f"Sugerencia: ${monto:.2f}")
+    cols = st.columns(len(proximos_partidos))
+
+    for i, juego in enumerate(proximos_partidos):
+        with cols[i]:
+            # Cálculo de Valor Esperado (EV)
+            ev = (juego['prob_h'] * juego['cuota_h']) - 1
+            
+            st.markdown(f"### {juego['equipo']}")
+            
+            if ev >= min_ev:
+                st.write(f"🎯 **Pick Sugerido:** {juego['pick']}")
+                st.metric("EV Detectado", f"{ev:+.2%}")
+                
+                # Gestión de Riesgo (Criterio de Kelly al 20%)
+                b = juego['cuota_h'] - 1
+                p = juego['prob_h']
+                q = 1 - p
+                kelly = (b * p - q) / b
+                apuesta_sugerida = max(0, kelly * bankroll * 0.2)
+                
+                st.success(f"💸 Apostar: ${apuesta_sugerida:.2f}")
+            else:
+                st.info("Buscando valor...")
             st.divider()
+
+    st.write("💡 *El modelo analiza variables de rendimiento, agresividad y efectividad de tiros.*")
+
+else:
+    st.warning("⚠️ Esperando conexión con el modelo para iniciar el análisis...")
